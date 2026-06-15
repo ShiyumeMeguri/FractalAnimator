@@ -87,6 +87,42 @@ public sealed class GoogologyIndicator : IScaleIndicator
     public void SetFont(Font f) => _font = f;
 }
 
+/// <summary>
+/// Top-left magnification readout drawn as a power of ten — "10ⁿ" with a raised exponent — instead of
+/// scientific notation, so the depth reads at a glance. The exponent is log10 of the magnification.
+/// </summary>
+public sealed class MagnificationPowerIndicator : IScaleIndicator
+{
+    Font _font = FontRepository.Instance.CreateRoboto(48);
+    double _scale = 1;
+
+    /// <summary>Zoom level treated as "1×". Set to the start zoom so the readout climbs from 10⁰.</summary>
+    public double ReferenceZooms { get; set; }
+
+    public void Draw(Graphics g, FractalScale s, int w, int h)
+    {
+        g.TextRenderingHint = TextRenderingHint.AntiAlias;
+        var exponent = (s.GetZooms() - ReferenceZooms) * 0.3010299956639812; // log10 of magnification vs the start
+        var baseSize = (float)(50 * _scale);
+        var expSize = baseSize * 0.6f;
+        using var baseFont = new Font(_font.FontFamily, baseSize, FontStyle.Regular, GraphicsUnit.Pixel);
+        using var expFont = new Font(_font.FontFamily, expSize, FontStyle.Regular, GraphicsUnit.Pixel);
+        var margin = (float)(22 * _scale);
+        var off = baseSize / 14f;
+        const string basePart = "×10";
+        var expPart = exponent.ToString("F1", CultureInfo.InvariantCulture);
+        var baseWidth = g.MeasureString(basePart, baseFont).Width;
+        var expY = margin - expSize * 0.25f;
+        g.DrawString(basePart, baseFont, Brushes.Black, margin + off, margin + off);
+        g.DrawString(expPart, expFont, Brushes.Black, margin + baseWidth + off, expY + off);
+        g.DrawString(basePart, baseFont, Brushes.White, margin, margin);
+        g.DrawString(expPart, expFont, Brushes.White, margin + baseWidth, expY);
+    }
+
+    public void SetScale(double s) => _scale = s;
+    public void SetFont(Font f) => _font = f;
+}
+
 public sealed class OdometerIndicator : IScaleIndicator
 {
     Bitmap _bm = new(1, 1, PixelFormat.Format24bppRgb);

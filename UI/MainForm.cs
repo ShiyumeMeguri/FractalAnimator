@@ -25,6 +25,7 @@ public sealed class MainForm : Form, IExportable
     static readonly Dictionary<Type, Func<ImageLoaderConfigure>> LoaderFactories = new()
     {
         [typeof(FractalScriptLoaderConfigure)] = () => new FractalScriptLoaderConfigure(),
+        [typeof(ShaderFractalLoaderConfigure)] = () => new ShaderFractalLoaderConfigure(),
         [typeof(SimpleMandelbrotLoaderConfigure)] = () => new SimpleMandelbrotLoaderConfigure(),
         [typeof(RayMarchFractalLoaderConfigure)] = () => new RayMarchFractalLoaderConfigure(),
         [typeof(FzImageLoaderConfigure)] = () => new FzImageLoaderConfigure(),
@@ -87,8 +88,8 @@ public sealed class MainForm : Form, IExportable
 
         var labelsPage = new TabPage("Scale labels") { Padding = new Padding(6) };
         _indiPanel = new IndicatorSelectorPanel([
-            typeof(KfScaleIndicator), typeof(FxScaleIndicator), typeof(OdometerIndicator),
-            typeof(ExponentialScaleIndicator), typeof(GoogologyIndicator)
+            typeof(MagnificationPowerIndicator), typeof(KfScaleIndicator), typeof(FxScaleIndicator),
+            typeof(OdometerIndicator), typeof(ExponentialScaleIndicator), typeof(GoogologyIndicator)
         ]) { Dock = DockStyle.Fill };
         labelsPage.Controls.Add(_indiPanel);
         tabs.TabPages.Add(labelsPage);

@@ -295,7 +295,16 @@ public sealed class FractalScriptLoaderConfigure : ImageLoaderConfigure
         {
             var real = BigDecimalCompat.Parse(_real.Text);
             var imag = BigDecimalCompat.Parse(_imag.Text);
-            _preview.RenderPreview(_fractal, real, imag, (double)_zoomLevels.Value, (int)_iter.Value, (double)_density.Value);
+            var fractal = _fractal;
+            var zooms = (double)_zoomLevels.Value;
+            var iterations = (int)_iter.Value;
+            var density = (double)_density.Value;
+            _preview.RenderPreview((size, token) =>
+            {
+                var buffer = new float[size * size];
+                PerturbationEngine.Render(fractal, real, imag, zooms, size, size, iterations, buffer, token);
+                return FractalColoring.Colorize(buffer, size, size, density);
+            });
         }
         catch (Exception ex)
         {

@@ -34,8 +34,12 @@ public sealed class FractalPreview : Panel
         MouseWheel += (_, e) => ZoomChanged?.Invoke(e.Delta > 0 ? 2 : -2);
     }
 
-    public void RenderPreview(IFractal fractal, BigDecimalCompat real, BigDecimalCompat imag,
-        double zooms, int iterations, double density)
+    /// <summary>
+    /// Renders a fresh preview tile in the background. The caller supplies a render function that, given
+    /// a square pixel size and a cancellation token, returns the colored bitmap — so any fractal engine
+    /// can drive the same preview surface.
+    /// </summary>
+    public void RenderPreview(Func<int, CancellationToken, Bitmap> render)
     {
         _cts?.Cancel();
         var cts = new CancellationTokenSource();
@@ -50,14 +54,12 @@ public sealed class FractalPreview : Panel
         {
             try
             {
-                var buffer = new float[size * size];
-                PerturbationEngine.Render(fractal, real, imag, zooms, size, size, iterations, buffer, token);
+                var bitmap = render(size, token);
                 token.ThrowIfCancellationRequested();
-                var bitmap = FractalColoring.Colorize(buffer, size, size, density);
-                if (!IsHandleCreated || token.IsCancellationRequested) { bitmap.Dispose(); return; }
+                if (!IsHandleCreated || token.IsCancellationRequested) { bitmap?.Dispose(); return; }
                 BeginInvoke(() =>
                 {
-                    if (cts != _cts) { bitmap.Dispose(); return; }
+                    if (cts != _cts) { bitmap?.Dispose(); return; }
                     _bitmap?.Dispose();
                     _bitmap = bitmap;
                     _busy = false;

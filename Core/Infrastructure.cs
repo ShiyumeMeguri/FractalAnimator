@@ -182,6 +182,7 @@ public static class Localization
         ["font_chooser.title"] = "Choose a font",
 
         ["class.hywt.fractal.animator.ui.FractalScriptLoaderConfigure"] = "Fractal formula (live compile)",
+        ["class.hywt.fractal.animator.ui.ShaderFractalLoaderConfigure"] = "FractalParadise (shader art)",
         ["class.hywt.fractal.animator.ui.SimpleMandelbrotLoaderConfigure"] = "Mandelbrot (quick)",
         ["class.hywt.fractal.animator.ui.RayMarchFractalLoaderConfigure"] = "Mandelbulb 3D (ray-march)",
         ["class.hywt.fractal.animator.ui.FzImageLoaderConfigure"] = "FractalZoomer images",
@@ -192,6 +193,7 @@ public static class Localization
         ["class.hywt.fractal.animator.ui.SlopeAccelInterpolatorConfigure"] = "Smooth (eased slopes)",
         ["class.hywt.fractal.animator.ui.AccelInterpolatorConfigure"] = "Accelerate / decelerate",
 
+        ["indicator.class.hywt.fractal.animator.indicator.MagnificationPowerIndicator"] = "Magnification 10ⁿ (top-left)",
         ["indicator.class.hywt.fractal.animator.indicator.KfScaleIndicator"] = "Magnification (KF style)",
         ["indicator.class.hywt.fractal.animator.indicator.FxScaleIndicator"] = "Zoom count (FX style)",
         ["indicator.class.hywt.fractal.animator.indicator.OdometerIndicator"] = "Odometer",
