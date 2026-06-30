@@ -31,20 +31,25 @@ public sealed class Mb3dCamera
             _scene.Ystart[2] + g[2] * ix + g[5] * iy);
     }
 
-    /// <summary>World-space ray direction (length = StepWidth, matching the marcher's step units).</summary>
-    public Vec3d Direction(int ix, int iy)
+    /// <summary>The camera/Vgrads-frame view direction (unit), before rotation into world space.</summary>
+    public Vec3d CameraSpaceDirection(int ix, int iy)
     {
         double cafY = ((double)iy / _scene.Height - 0.5) * _scene.FovY;
         double cafX = (_scene.FovXOffset - ix) * _scene.FovXMul;
-
-        Vec3d cam = _scene.CameraOptic switch
+        return _scene.CameraOptic switch
         {
             1 => new Vec3d(-cafX, cafY, _scene.PlanarOpticZ).Normalized(),     // rectilinear
             2 => BuildPanorama(cafY, cafX),                                    // equirectangular
             _ => BuildAngular(cafY, cafX),                                     // fisheye / angular
         };
+    }
 
-        // RotateVectorReverse: V[j] = sum_i cam[i] * VGrads[row i][j]  (multiply by the basis rows).
+    /// <summary>World-space ray direction (length = StepWidth, matching the marcher's step units).</summary>
+    public Vec3d Direction(int ix, int iy) => CameraToWorld(CameraSpaceDirection(ix, iy));
+
+    /// <summary>RotateVectorReverse: V[j] = sum_i cam[i] * VGrads[row i][j] (multiply by the basis rows).</summary>
+    public Vec3d CameraToWorld(Vec3d cam)
+    {
         var g = _scene.VGrads;
         return new Vec3d(
             cam.X * g[0] + cam.Y * g[3] + cam.Z * g[6],

@@ -10,7 +10,12 @@ namespace FractalAnimator.Core.Mb3d.Render;
 public static class Mb3dIterator
 {
     public static double Iterate(Mb3dSceneParameters scene, double startX, double startY, double startZ,
-        int maxIterations, double escapeRadiusSquared, out int iterationCount)
+        int maxIterations, double escapeRadiusSquared, out int iterationCount) =>
+        Iterate(scene, startX, startY, startZ, maxIterations, escapeRadiusSquared, out iterationCount, out _);
+
+    /// <summary>As above, also reporting the orbit trap (minimum |z|^2 over the iteration), used for coloring.</summary>
+    public static double Iterate(Mb3dSceneParameters scene, double startX, double startY, double startZ,
+        int maxIterations, double escapeRadiusSquared, out int iterationCount, out double orbitTrap)
     {
         var state = new Mb3dFormulaState
         {
@@ -24,6 +29,7 @@ public static class Mb3dIterator
 
         var slots = scene.Slots;
         double rout = startX * startX + startY * startY + startZ * startZ;
+        double otrap = rout;
         int n = scene.HybridStart;
         int btmp = slots[n].IterationCount;
         int count = 0;
@@ -48,10 +54,12 @@ public static class Mb3dIterator
             btmp--;
             count++;
             rout = state.X * state.X + state.Y * state.Y + state.Z * state.Z;
+            if (rout < otrap) otrap = rout;
             if (count >= maxIterations || rout > escapeRadiusSquared) break;
         }
 
         iterationCount = count;
+        orbitTrap = otrap;
         return rout;
     }
 }

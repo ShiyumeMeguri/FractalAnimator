@@ -68,6 +68,9 @@ public sealed class Mb3dSceneParameters
     public bool IsJulia;
     public double Jx, Jy, Jz;
 
+    // Lighting + color (raw parsed block; the shader reads ambient/lights/colors from here).
+    public Mb3dLighting Lighting = null!;
+
     private const double Pid180 = Math.PI / 180.0;
 
     /// <summary>
@@ -129,6 +132,7 @@ public sealed class Mb3dSceneParameters
 
         scene.IsJulia = header.IsJulia != 0;
         scene.Jx = header.Jx; scene.Jy = header.Jy; scene.Jz = header.Jz;
+        scene.Lighting = header.Light;
 
         // Hybrid slot resolution (alt mode). nHybrid[n] = iterationCount; inactive slots are skipped.
         int lastActive = 0;

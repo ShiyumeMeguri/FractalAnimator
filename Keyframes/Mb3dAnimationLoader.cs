@@ -57,7 +57,8 @@ public sealed class Mb3dAnimationLoader : ImageLoader
         {
             if (_bitmap != null) return _bitmap;
             var scene = Mb3dSceneParameters.FromHeader(_keyframe.Header, _keyframe.Addon, _width, _height);
-            uint[] pixels = new Mb3dRenderer(scene).Render();
+            var paint = Mb3dPaintParameters.FromHeader(_keyframe.Header);
+            uint[] pixels = new Mb3dRenderer(scene, paint).Render();
             _bitmap = ToBitmap(pixels, _width, _height);
             return _bitmap;
         }

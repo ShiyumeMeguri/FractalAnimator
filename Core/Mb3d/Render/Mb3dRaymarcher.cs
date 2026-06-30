@@ -7,7 +7,9 @@ public struct Mb3dHit
     public Vec3d Position;
     public double Depth;          // mZZ in step units
     public int IterationCount;
-    public Vec3d Normal;          // world-space, unit length (outward)
+    public double OrbitTrap;      // min |z|^2 over the orbit at the hit (for coloring)
+    public Vec3d Normal;          // camera/Vgrads-frame, unit length (matches MB3D light frame)
+    public Vec3d ViewVec;         // camera/Vgrads-frame view direction (for specular reflect)
 }
 
 /// <summary>
@@ -38,7 +40,8 @@ public sealed class Mb3dRaymarcher
     public Mb3dHit March(int ix, int iy)
     {
         Vec3d origin = _camera.Origin(ix, iy);
-        Vec3d dir = _camera.Direction(ix, iy);
+        Vec3d camDir = _camera.CameraSpaceDirection(ix, iy);
+        Vec3d dir = _camera.CameraToWorld(camDir);
         Vec3d pos = origin;
         double mZZ = 0;
         double msDEstop = _scene.DEstop;
@@ -46,7 +49,7 @@ public sealed class Mb3dRaymarcher
 
         double dist = DE(pos, out int itResult, out int maxItResult);
         if (itResult >= maxItResult || dist < msDEstop)
-            return Finish(pos, mZZ, itResult, dir);
+            return Finish(pos, mZZ, itResult, camDir);
 
         double lastStep = dist * _scene.ZStepDiv;
         do
@@ -82,7 +85,7 @@ public sealed class Mb3dRaymarcher
             {
                 if (_scene.DEAddSteps != 0)
                     BinarySearch(ref pos, ref mZZ, ref dist, ref itResult, ref maxItResult, lastStep, dir, msDEstop);
-                return Finish(pos, mZZ, itResult, dir);
+                return Finish(pos, mZZ, itResult, camDir);
             }
         }
         while (mZZ <= _scene.ZEnd);
@@ -107,7 +110,7 @@ public sealed class Mb3dRaymarcher
         }
     }
 
-    private Mb3dHit Finish(Vec3d pos, double mZZ, int itResult, Vec3d dir)
+    private Mb3dHit Finish(Vec3d pos, double mZZ, int itResult, Vec3d camDir)
     {
         double noffset = Math.Min(1.0, _scene.DEstop) * 0.15;
         var g = _scene.VGrads;
@@ -115,16 +118,21 @@ public sealed class Mb3dRaymarcher
         var axis1 = new Vec3d(g[3], g[4], g[5]);
         var axis2 = new Vec3d(g[6], g[7], g[8]);
 
+        // Central differences of the DE along the camera axes (RMCalculateNormals); the resulting
+        // (n0,n1,n2) is the surface normal in the camera/Vgrads frame, the same frame as the lights.
         double n2 = (DE(pos + axis2 * noffset, out _, out _) - DE(pos - axis2 * noffset, out _, out _)) * 0.5;
         double n0 = (DE(pos + axis0 * noffset, out _, out _) - DE(pos - axis0 * noffset, out _, out _)) * 0.5;
         double n1 = (DE(pos + axis1 * noffset, out _, out _) - DE(pos - axis1 * noffset, out _, out _)) * 0.5;
+        Vec3d normal = new Vec3d(n0, n1, n2).Normalized();
 
-        // Lift the camera-frame gradient (n0,n1,n2) into world space via the unit camera axes.
-        Vec3d u0 = axis0.Normalized(), u1 = axis1.Normalized(), u2 = axis2.Normalized();
-        Vec3d normal = (u0 * n0 + u1 * n1 + u2 * n2).Normalized();
-        // The DE gradient points outward (toward increasing distance); face it toward the camera.
-        if (Vec3d.Dot(normal, dir) > 0) normal = normal * -1;
+        // Orbit trap + iteration count at the final surface point (for coloring).
+        Mb3dIterator.Iterate(_scene, pos.X, pos.Y, pos.Z, _scene.MaxIterations, _scene.EscapeRadiusSquared,
+            out int hitIter, out double orbitTrap);
 
-        return new Mb3dHit { IsHit = true, Position = pos, Depth = mZZ, IterationCount = itResult, Normal = normal };
+        return new Mb3dHit
+        {
+            IsHit = true, Position = pos, Depth = mZZ, IterationCount = hitIter,
+            OrbitTrap = orbitTrap, Normal = normal, ViewVec = camDir,
+        };
     }
 }
