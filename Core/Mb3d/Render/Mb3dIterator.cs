@@ -36,7 +36,15 @@ public static class Mb3dIterator
                 if (n > scene.HybridEnd) n = scene.HybridRepeatFrom;
                 btmp = slots[n].IterationCount;
             }
-            slots[n].Step(ref state, slots[n].Parameters);
+            var slot = slots[n];
+            switch (slot.Kind)
+            {
+                case Mb3dFormulaKind.AmazingBox: Mb3dFormulas.AmazingBox(ref state, slot.Parameters); break;
+                case Mb3dFormulaKind.AmazingSurf: Mb3dFormulas.AmazingSurf(ref state, slot.Parameters); break;
+                case Mb3dFormulaKind.SinY: Mb3dFormulas.SinY(ref state, slot.Parameters); break;
+                case Mb3dFormulaKind.ReciprocalZ3b: Mb3dFormulas.ReciprocalZ3b(ref state, slot.Parameters); break;
+                case Mb3dFormulaKind.JCube3: Mb3dFormulas.JCube3(ref state, slot.Parameters); break;
+            }
             btmp--;
             count++;
             rout = state.X * state.X + state.Y * state.Y + state.Z * state.Z;

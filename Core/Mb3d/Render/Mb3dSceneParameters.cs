@@ -1,14 +1,22 @@
 namespace FractalAnimator.Core.Mb3d.Render;
 
-/// <summary>A formula iteration step: transforms the vector in <see cref="Mb3dFormulaState"/>.</summary>
-public delegate void Mb3dFormulaStep(ref Mb3dFormulaState state, Mb3dFormulaParams parameters);
+/// <summary>Identifies which formula a hybrid slot runs (switch dispatch avoids per-iteration delegate calls).</summary>
+public enum Mb3dFormulaKind
+{
+    None,
+    AmazingBox,
+    AmazingSurf,
+    SinY,
+    ReciprocalZ3b,
+    JCube3,
+}
 
-/// <summary>One active hybrid slot: its iteration weight, packed parameters, and transform.</summary>
+/// <summary>One active hybrid slot: its iteration weight, packed parameters, and which formula it runs.</summary>
 public sealed class Mb3dRenderFormula
 {
     public int IterationCount;
     public Mb3dFormulaParams Parameters = null!;
-    public Mb3dFormulaStep Step = null!;
+    public Mb3dFormulaKind Kind;
 }
 
 /// <summary>
@@ -136,7 +144,7 @@ public sealed class Mb3dSceneParameters
                 Parameters = active
                     ? Mb3dFormulaParams.Build(slot.OptionTypes, slot.OptionValues, slot.OptionCount)
                     : Mb3dFormulaParams.Build([], [], 0),
-                Step = active ? ResolveFormula(slot) : static (ref Mb3dFormulaState _, Mb3dFormulaParams _) => { },
+                Kind = active ? ResolveFormula(slot) : Mb3dFormulaKind.None,
             };
             if (active) lastActive = i;
         }
@@ -149,18 +157,18 @@ public sealed class Mb3dSceneParameters
         return scene;
     }
 
-    private static Mb3dFormulaStep ResolveFormula(Mb3dFormulaSlot slot)
+    private static Mb3dFormulaKind ResolveFormula(Mb3dFormulaSlot slot)
     {
         // Built-in #4 is "Amazing Box"; the rest are matched by name (CustomFtoStr style).
         string key = slot.Name.Replace(" ", "").ToUpperInvariant();
         return key switch
         {
-            "AMAZINGBOX" => Mb3dFormulas.AmazingBox,
-            "AMAZINGSURF" => Mb3dFormulas.AmazingSurf,
-            "_SINY" => Mb3dFormulas.SinY,
-            "_RECIPROCALZ3B" => Mb3dFormulas.ReciprocalZ3b,
-            "JCUBE3" => Mb3dFormulas.JCube3,
-            _ => static (ref Mb3dFormulaState _, Mb3dFormulaParams _) => { }, // unsupported -> identity (inactive)
+            "AMAZINGBOX" => Mb3dFormulaKind.AmazingBox,
+            "AMAZINGSURF" => Mb3dFormulaKind.AmazingSurf,
+            "_SINY" => Mb3dFormulaKind.SinY,
+            "_RECIPROCALZ3B" => Mb3dFormulaKind.ReciprocalZ3b,
+            "JCUBE3" => Mb3dFormulaKind.JCube3,
+            _ => Mb3dFormulaKind.None, // unsupported -> inactive
         };
     }
 }
