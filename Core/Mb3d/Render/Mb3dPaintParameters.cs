@@ -26,6 +26,7 @@ public sealed class Mb3dPaintParameters
     public double DiffuseMultiplier;     // sDiff
     public double SpecularMultiplier;    // sSpec
     public double DepthFog;              // sDepth = TBpos[4] * 0.8e-6
+    public double Roughness;             // dRough approximation: RoughnessFactor/255 (per-pixel sRoughness ~1 on detailed surfaces)
     public Vec3d AmbientColor;           // AmbCol * ambMult (0..255)
     public Vec3d AmbientColor2;          // AmbCol2 * ambMult
     public Vec3d DepthColor;             // DepthCol (0..255), bottom of background gradient
@@ -56,6 +57,7 @@ public sealed class Mb3dPaintParameters
         p.DepthFog = Tb(tb, 4) * 0.8e-6;
         p.SpecularMultiplier = Math.Max(0.004, (Tb(tb, 7) & 0xFFF) * 0.02);
         double ambMult = (Tb(tb, 8) & 0xFFF) / 90.0;
+        p.Roughness = light.RoughnessFactor / 255.0;
         p.ColorOnOrbitTrap = (int)((light.TrackbarOptions >> 17) & 1); // diffmap off -> just this bit
         p.ColorCycling = (light.TrackbarOptions & 0x4000) != 0;
 

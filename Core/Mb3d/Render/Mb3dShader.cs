@@ -30,7 +30,7 @@ public static class Mb3dShader
             if (!light.Active || light.Positional) continue; // global lights only for now
             Vec3d l = light.Direction;
 
-            double diffuse = DiffuseResponse(light.DiffuseFunction, Vec3d.Dot(n, l));
+            double diffuse = Mb3dDiffuseTable.Evaluate(light.DiffuseFunction, Vec3d.Dot(n, l), paint.Roughness);
             diffuseLight += light.Color * diffuse;
 
             // Specular: reflect the view vector about the normal, dot with the light direction.
@@ -110,15 +110,6 @@ public static class Mb3dShader
         return Lerp(p.DepthColor2, p.DepthColor, s);
     }
 
-    // Closed forms of the diffuse response tables (SetCosTabFunction, LightAdjust.pas:622), Rough = 0.
-    private static double DiffuseResponse(int function, double d) => function switch
-    {
-        0 => d <= 0 ? 0 : d > 0.15 ? (d - 0.08) * 1.0869565 : Math.Pow(d, Math.Max(1, (0.505 - d) * 3.8)),
-        1 => d <= 0 ? 0 : d * d,
-        2 => d * 0.5 + 0.5,
-        _ => Sqr(d * 0.5 + 0.5),
-    };
-
     // Orbit-trap -> 15-bit index: RMdoColor (Calc.pas:1296) default option is OTrap*4096, clipped to 0..32767.
     private static double EncodeOrbitTrap(double orbitTrap, Mb3dSceneParameters scene) =>
         Math.Clamp(orbitTrap * 4096, 0, 32767);
@@ -133,7 +124,6 @@ public static class Mb3dShader
 
     private static Vec3d Hadamard(Vec3d a, Vec3d b) => new(a.X * b.X, a.Y * b.Y, a.Z * b.Z);
     private static Vec3d Lerp(Vec3d a, Vec3d b, double w) => a * w + b * (1 - w);
-    private static double Sqr(double v) => v * v;
 
     private static uint Pack(Vec3d color)
     {
