@@ -25,6 +25,7 @@ public sealed class Mb3dPaintParameters
     public readonly Mb3dRenderLight[] Lights = new Mb3dRenderLight[6];
     public double DiffuseMultiplier;     // sDiff
     public double SpecularMultiplier;    // sSpec
+    public double DepthFog;              // sDepth = TBpos[4] * 0.8e-6
     public Vec3d AmbientColor;           // AmbCol * ambMult (0..255)
     public Vec3d AmbientColor2;          // AmbCol2 * ambMult
     public Vec3d DepthColor;             // DepthCol (0..255), bottom of background gradient
@@ -50,6 +51,7 @@ public sealed class Mb3dPaintParameters
 
         // Scalars (HeaderTrafos.pas:1292-1423).
         p.DiffuseMultiplier = Tb(tb, 5) * 0.02;
+        p.DepthFog = Tb(tb, 4) * 0.8e-6;
         p.SpecularMultiplier = Math.Max(0.004, (Tb(tb, 7) & 0xFFF) * 0.02);
         double ambMult = (Tb(tb, 8) & 0xFFF) / 90.0;
         p.ColorOnOrbitTrap = (int)((light.TrackbarOptions >> 17) & 1); // diffmap off -> just this bit

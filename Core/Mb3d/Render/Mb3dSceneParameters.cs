@@ -48,6 +48,8 @@ public sealed class Mb3dSceneParameters
     public int DEAddSteps;                   // binary-search refinement steps
     public double ZEnd;                      // (dZend - dZstart) / StepWidth, march length bound
     public bool FirstStepRandom;
+    public double Zcorr;                      // depth-buffer nonlinearity (CalcPPZvals)
+    public double ZcMul;                      // depth-buffer scale (CalcPPZvals)
 
     // Distance estimate (numeric gradient path).
     public double GradientOffset;            // world-space sampling offset = g0 * StepWidth
@@ -118,6 +120,10 @@ public sealed class Mb3dSceneParameters
         scene.DEAddSteps = header.StepsAfterDEStop;
         scene.ZEnd = (header.ZEnd - header.ZStart) / scene.StepWidth;
         scene.FirstStepRandom = (header.Options & 1) != 0;
+
+        // Depth-buffer mapping for fog (CalcPPZvals, DivUtils.pas:1016).
+        scene.Zcorr = Math.Sin(Math.Max(scene.FovY, 1.0) / height);
+        scene.ZcMul = 32767.0 * 256.0 / (Math.Sqrt(scene.ZEnd * scene.Zcorr + 1) - 0.999999999);
 
         double g0 = Math.Min(scene.DEstop * 0.1, 0.004);
         scene.NumericDEscale = g0;

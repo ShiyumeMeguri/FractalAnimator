@@ -44,7 +44,23 @@ public static class Mb3dShader
         Vec3d ambient = Hadamard(paint.AmbientColor * (1 - a) + paint.AmbientColor2 * a, surfaceDiffuse);
         Vec3d diffuseColor = surfaceDiffuse * paint.DiffuseMultiplier;
         Vec3d final = ambient + Hadamard(diffuseColor, diffuseLight) + Hadamard(surfaceSpecular, specularLight);
+
+        // Depth fog: blend toward the depth-gradient color by distance (CalcPixelColor2:623-650).
+        double zpos = DepthToZpos(hit.Depth, scene);
+        double near = Math.Max(0, (zpos - 28000) * paint.DepthFog + 1);
+        if (near < 1)
+        {
+            Vec3d depthColor = Background(paint, scene, iy);
+            final = final * near + depthColor * (1 - near);
+        }
         return Pack(final);
+    }
+
+    // mZZ (step-unit depth) -> 0..32767 Zpos (near=32767, far=0); CalcZposAndRough (Calc.pas:2780).
+    private static double DepthToZpos(double depth, Mb3dSceneParameters scene)
+    {
+        double itmp = 8388352 - scene.ZcMul * (Math.Sqrt(depth * scene.Zcorr + 1) - 1);
+        return Math.Clamp(itmp, 0, 8388352) / 256.0;
     }
 
     // CalcColors (PaintThread.pas:387): map the iteration/orbit-trap value into the LCols stop range,
