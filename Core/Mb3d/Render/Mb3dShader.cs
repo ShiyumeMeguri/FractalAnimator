@@ -53,7 +53,18 @@ public static class Mb3dShader
             Vec3d depthColor = Background(paint, scene, iy);
             final = final * near + depthColor * (1 - near);
         }
-        return Pack(final);
+        return Pack(ApplyGamma(final, paint));
+    }
+
+    // Gamma blend (CalcPixelColor2:716-724): brighten via sqrt(c*255) or darken via c^2/255, lerped by sGamma.
+    private static Vec3d ApplyGamma(Vec3d color, Mb3dPaintParameters paint)
+    {
+        if (paint.GammaSign == 0) return color;
+        Vec3d clamped = new(Math.Clamp(color.X, 0, 255), Math.Clamp(color.Y, 0, 255), Math.Clamp(color.Z, 0, 255));
+        Vec3d gamma = paint.GammaSign > 0
+            ? new Vec3d(Math.Sqrt(clamped.X * 255), Math.Sqrt(clamped.Y * 255), Math.Sqrt(clamped.Z * 255))
+            : new Vec3d(clamped.X * clamped.X / 255, clamped.Y * clamped.Y / 255, clamped.Z * clamped.Z / 255);
+        return gamma * paint.GammaBlend + clamped * (1 - paint.GammaBlend);
     }
 
     // mZZ (step-unit depth) -> 0..32767 Zpos (near=32767, far=0); CalcZposAndRough (Calc.pas:2780).

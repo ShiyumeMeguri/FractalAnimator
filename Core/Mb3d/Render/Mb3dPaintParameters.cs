@@ -36,6 +36,8 @@ public sealed class Mb3dPaintParameters
     public readonly Vec3d[] ColorSpecular = new Vec3d[10];// 0..1
     public readonly double[] ColorSlope = new double[10]; // 1/(gap)
 
+    public int GammaSign;                // iGammaH: -1 darken, 0 none, 1 brighten
+    public double GammaBlend;            // sGamma
     public double ColorStart;            // sCStart
     public double ColorMul;              // sCmul
     public int ColorOnOrbitTrap;         // iColOnOT (bit0: 0=iteration, 1=orbit trap)
@@ -56,6 +58,11 @@ public sealed class Mb3dPaintParameters
         double ambMult = (Tb(tb, 8) & 0xFFF) / 90.0;
         p.ColorOnOrbitTrap = (int)((light.TrackbarOptions >> 17) & 1); // diffmap off -> just this bit
         p.ColorCycling = (light.TrackbarOptions & 0x4000) != 0;
+
+        // Gamma (HeaderTrafos.pas:1281-1287).
+        int gi = (int)((light.TrackbarOptions >> 23) & 0x3F);
+        p.GammaSign = gi == 32 ? 0 : gi < 32 ? -1 : 1;
+        p.GammaBlend = gi < 32 ? 1 - gi / 32.0 : (gi - 32) / 31.0;
         p.SmoothIterationScale = 32767.0 / Math.Max(1, header.Iterations + 1);
 
         // sCStart / sCmul (CalcSCstartAndSCmul, HeaderTrafos.pas:1186-1195).
