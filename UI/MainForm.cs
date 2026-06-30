@@ -28,6 +28,7 @@ public sealed class MainForm : Form, IExportable
         [typeof(ShaderFractalLoaderConfigure)] = () => new ShaderFractalLoaderConfigure(),
         [typeof(SimpleMandelbrotLoaderConfigure)] = () => new SimpleMandelbrotLoaderConfigure(),
         [typeof(RayMarchFractalLoaderConfigure)] = () => new RayMarchFractalLoaderConfigure(),
+        [typeof(Mb3dAnimationLoaderConfigure)] = () => new Mb3dAnimationLoaderConfigure(),
         [typeof(FzImageLoaderConfigure)] = () => new FzImageLoaderConfigure(),
         [typeof(KfImageLoaderConfigure)] = () => new KfImageLoaderConfigure(),
         [typeof(KfbLoaderConfigure)] = () => new KfbLoaderConfigure(),

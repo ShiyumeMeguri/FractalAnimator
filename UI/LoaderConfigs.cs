@@ -41,6 +41,15 @@ public sealed class MapleMandelMakerLoaderConfigure : FileLoaderBase
     public override void ImportJson(JsonObject o) { _ = LoadPath(o.GetString("path")); }
 }
 
+public sealed class Mb3dAnimationLoaderConfigure : FileLoaderBase
+{
+    protected override string DescKey => "image.m3a.description";
+    protected override string LabelKey => "image.m3a.file";
+    protected override ImageLoader Make(string p) => new Mb3dAnimationLoader(p);
+    public override JsonObject ExportJson() => new() { ["path"] = _path ?? "" };
+    public override void ImportJson(JsonObject o) { _ = LoadPath(o.GetString("path")); }
+}
+
 public sealed class SimpleMandelbrotLoaderConfigure : ImageLoaderConfigure
 {
     ImageLoader? _mgr; TextBox _re = null!, _im = null!, _magn = null!, _iter = null!; Button _btn = null!;

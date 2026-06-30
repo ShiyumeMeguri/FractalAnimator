@@ -159,6 +159,9 @@ public static class Localization
         ["image.maple.description"] = "A MapleMandelMaker configuration file describing a keyframe sequence.",
         ["image.maple.config"] = "MapleMandelMaker config file",
 
+        ["image.m3a.description"] = "A Mandelbulb3D animation (.m3a). Each keyframe is rendered with the faithful MB3D ray-marcher.",
+        ["image.m3a.file"] = "Mandelbulb3D .m3a file",
+
         ["menu.files"] = "Project",
         ["menu.files.load"] = "Open project…",
         ["menu.files.save"] = "Save project…",
@@ -185,6 +188,7 @@ public static class Localization
         ["class.hywt.fractal.animator.ui.ShaderFractalLoaderConfigure"] = "FractalParadise (shader art)",
         ["class.hywt.fractal.animator.ui.SimpleMandelbrotLoaderConfigure"] = "Mandelbrot (quick)",
         ["class.hywt.fractal.animator.ui.RayMarchFractalLoaderConfigure"] = "Mandelbulb 3D (ray-march)",
+        ["class.hywt.fractal.animator.ui.Mb3dAnimationLoaderConfigure"] = "Mandelbulb3D animation (.m3a)",
         ["class.hywt.fractal.animator.ui.FzImageLoaderConfigure"] = "FractalZoomer images",
         ["class.hywt.fractal.animator.ui.KfImageLoaderConfigure"] = "Kalles Fraktaler PNG",
         ["class.hywt.fractal.animator.ui.KfbLoaderConfigure"] = "Kalles Fraktaler .kfb",
