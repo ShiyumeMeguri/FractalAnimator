@@ -57,6 +57,15 @@ public sealed class Mb3dSceneParameters
     public double DenomEpsilon;              // g0 * 0.06
     public double Rstop3D;                   // RStop^4 * 64 (escape during gradient sampling)
 
+    // DE-based ambient occlusion (DEAO; bCalcAmbShadowAutomatic type 3). See Mb3dAmbientOcclusion.
+    public bool AmbShadowEnabled;            // (CalcAmbShadowAutomatic and 1) <> 0
+    public int AmbShadowQuality;             // (CalcAmbShadowAutomatic shr 4) and 3 -> ray pattern
+    public bool AmbShadowFirstStepRandom;    // (CalcAmbShadowAutomatic and 128) <> 0 (FSR)
+    public double DEAOmaxL;                   // sDEAOmaxL: max ray length multiplier (header.DEAOmaxL)
+    public double AmbShadowAmplitude;         // sAmbShad = (TBpos[11] and $FF) / 53 (HeaderTrafos.pas:1317)
+    public bool VaryDEstop;                   // bVaryDEstop = (VaryDEstopOnFOV <> 0)
+    public double DEstopFactor;               // mctDEstopFactor: per-depth DEstop growth (GetDEstopFactor)
+
     // Iteration.
     public int MaxIterations;
     public int MinIterations;
@@ -139,6 +148,26 @@ public sealed class Mb3dSceneParameters
         scene.IsJulia = header.IsJulia != 0;
         scene.Jx = header.Jx; scene.Jy = header.Jy; scene.Jz = header.Jz;
         scene.Lighting = header.Light;
+
+        // DEAO constants (HeaderTrafos.pas:567-569, 1317; CalcAmbShadowDE.pas:63-69).
+        scene.AmbShadowEnabled = (header.CalcAmbShadowAutomatic & 1) != 0;
+        scene.AmbShadowQuality = (header.CalcAmbShadowAutomatic >> 4) & 3;
+        scene.AmbShadowFirstStepRandom = (header.CalcAmbShadowAutomatic & 128) != 0;
+        scene.DEAOmaxL = header.DEAOmaxL;
+        scene.AmbShadowAmplitude = (header.Light.TrackbarPos[8] & 0xFF) / 53.0;  // TBpos[11] = TrackbarPos[8]
+        scene.VaryDEstop = header.VaryDEstopOnFOV != 0;
+        // mctDEstopFactor = GetDEstopFactor (HeaderTrafos.pas:58-72): stepwidth growth per unit depth.
+        scene.DEstopFactor = 0;
+        if (scene.VaryDEstop)
+        {
+            double ze = Math.Max(1e-16, scene.ZEnd);
+            double sin001 = Math.Sin(0.01);
+            double x1 = scene.CameraOptic == 2
+                ? 0.01 * height / (sin001 * Math.PI)
+                : 0.01 * height / (sin001 * Math.Max(1.0 / 65535.0, header.FOVy * Pid180));
+            double x2 = scene.StepWidth * (x1 + ze) / x1;
+            scene.DEstopFactor = (x2 - scene.StepWidth) / (scene.StepWidth * Math.Max(1.0 / 6.0, ze));
+        }
 
         // Hybrid slot resolution (alt mode). nHybrid[n] = iterationCount; inactive slots are skipped.
         int lastActive = 0;

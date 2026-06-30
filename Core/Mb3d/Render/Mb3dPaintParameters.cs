@@ -11,6 +11,7 @@ public struct Mb3dRenderLight
     public int DiffuseFunction; // 0..3
     public int SpecularExponent;
     public double MaxDistanceSquared;
+    public bool SubAmbShadow;   // bSubAmbSh: scale this light by dAmbSh (HS wanted but not computed) vs dFog
 }
 
 /// <summary>
@@ -27,6 +28,7 @@ public sealed class Mb3dPaintParameters
     public double SpecularMultiplier;    // sSpec
     public double DepthFog;              // sDepth = TBpos[4] * 0.8e-6
     public double Roughness;             // dRough approximation: RoughnessFactor/255 (per-pixel sRoughness ~1 on detailed surfaces)
+    public double DiffuseShadowing;      // sDiffuseShadowing = Lights[3].AdditionalByteEx/256 (drives dFog)
     public Vec3d AmbientColor;           // AmbCol * ambMult (0..255)
     public Vec3d AmbientColor2;          // AmbCol2 * ambMult
     public Vec3d DepthColor;             // DepthCol (0..255), bottom of background gradient
@@ -58,6 +60,7 @@ public sealed class Mb3dPaintParameters
         p.SpecularMultiplier = Math.Max(0.004, (Tb(tb, 7) & 0xFFF) * 0.02);
         double ambMult = (Tb(tb, 8) & 0xFFF) / 90.0;
         p.Roughness = light.RoughnessFactor / 255.0;
+        p.DiffuseShadowing = light.Lights[3].AdditionalByteEx / 256.0;
         p.ColorOnOrbitTrap = (int)((light.TrackbarOptions >> 17) & 1); // diffmap off -> just this bit
         p.ColorCycling = (light.TrackbarOptions & 0x4000) != 0;
 
@@ -84,6 +87,12 @@ public sealed class Mb3dPaintParameters
             if (!rl.Active) continue;
             rl.DiffuseFunction = (l.Function >> 4) & 3;
             rl.SpecularExponent = 2 << (l.Function & 7);
+            // bSubAmbSh = iHScalced xor iHSenabled (HeaderTrafos.pas:1337-1338, PaintThread.pas:496):
+            // true only when this light wants a hard shadow that wasn't computed (AO fallback);
+            // otherwise the light is scaled by the gentle dFog and hard shadows handle direction.
+            int hsEnabled = 1 - ((l.Option >> 6) & 1);
+            int hsCalced = hsEnabled & ((header.HScalculated >> (i + 2)) & 1);
+            rl.SubAmbShadow = (hsCalced ^ hsEnabled) != 0;
             bool positional = (((l.Option >> 2) & 7) | ((l.Function & 128) >> 4) & 1) != 0
                               && ((l.Option >> 2) & 1) != 0;
             rl.Positional = positional;

@@ -16,6 +16,12 @@ public static class Mb3dShader
         Vec3d n = hit.Normal;
         Vec3d view = hit.ViewVec;
 
+        // DE-based ambient occlusion (CalcPixelColor2:484). dAmbSh in (0,1], 1 = unoccluded. It always
+        // scales the ambient term; per light it scales by dAmbSh only when bSubAmbSh (hard shadow wanted
+        // but not computed), otherwise by the gentler diffuse-shadow fog dFog (PaintThread.pas:521/536).
+        double dAmbSh = Mb3dAmbientOcclusion.Compute(hit, scene);
+        double dFog = 1 + paint.DiffuseShadowing * (dAmbSh - 1);
+
         double index = (paint.ColorOnOrbitTrap & 1) == 0
             ? hit.IterationCount * paint.SmoothIterationScale
             : EncodeOrbitTrap(hit.OrbitTrap, scene);
@@ -29,19 +35,20 @@ public static class Mb3dShader
             ref readonly var light = ref paint.Lights[i];
             if (!light.Active || light.Positional) continue; // global lights only for now
             Vec3d l = light.Direction;
+            double lightShadow = light.SubAmbShadow ? dAmbSh : dFog;
 
-            double diffuse = Mb3dDiffuseTable.Evaluate(light.DiffuseFunction, Vec3d.Dot(n, l), paint.Roughness);
+            double diffuse = Mb3dDiffuseTable.Evaluate(light.DiffuseFunction, Vec3d.Dot(n, l), paint.Roughness) * lightShadow;
             diffuseLight += light.Color * diffuse;
 
             // Specular: reflect the view vector about the normal, dot with the light direction.
             Vec3d reflect = view - n * (2 * viewDotN);
             double rl = Vec3d.Dot(l, reflect);
             if (rl > 0)
-                specularLight += light.Color * (paint.SpecularMultiplier * FastPow(rl, light.SpecularExponent));
+                specularLight += light.Color * (paint.SpecularMultiplier * FastPow(rl, light.SpecularExponent) * lightShadow);
         }
 
         double a = n.Y * 0.5 + 0.5;
-        Vec3d ambient = Hadamard(paint.AmbientColor * (1 - a) + paint.AmbientColor2 * a, surfaceDiffuse);
+        Vec3d ambient = Hadamard((paint.AmbientColor * (1 - a) + paint.AmbientColor2 * a) * dAmbSh, surfaceDiffuse);
         Vec3d diffuseColor = surfaceDiffuse * paint.DiffuseMultiplier;
         Vec3d final = ambient + Hadamard(diffuseColor, diffuseLight) + Hadamard(surfaceSpecular, specularLight);
 
