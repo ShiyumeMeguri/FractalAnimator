@@ -66,6 +66,13 @@ public sealed class Mb3dSceneParameters
     public bool VaryDEstop;                   // bVaryDEstop = (VaryDEstopOnFOV <> 0)
     public double DEstopFactor;               // mctDEstopFactor: per-depth DEstop growth (GetDEstopFactor)
 
+    // Hard / soft directional shadows (CalcHardShadow.pas:132-258). The shadow ray marches the DE
+    // field from the surface toward each enabled light; a soft (penumbra) factor comes from the
+    // minimum (DE / distance) ratio along the ray.
+    public double HardShadowMaxLength;        // sHSmaxLengthMultiplier = header.HSmaxLengthMultiplier
+    public double SoftShadowRadius;           // header.MCSoftShadowRadius (drives the penumbra width)
+    public bool SoftShadow;                   // (header.Calc1HSsoft and 1) <> 0: store a soft 0..1 factor
+
     // Iteration.
     public int MaxIterations;
     public int MinIterations;
@@ -156,6 +163,13 @@ public sealed class Mb3dSceneParameters
         scene.DEAOmaxL = header.DEAOmaxL;
         scene.AmbShadowAmplitude = (header.Light.TrackbarPos[8] & 0xFF) / 53.0;  // TBpos[11] = TrackbarPos[8]
         scene.VaryDEstop = header.VaryDEstopOnFOV != 0;
+
+        // Hard/soft shadow constants (HeaderTrafos.pas:557-576, getMCTparasFromHeader). MCSoftShadowRadius
+        // is already a float in the C# header (read via ReadShortFloat); clamp it away from 0 because the
+        // ZRSmul penumbra scale divides by it (CalcHardShadow.pas:148-151).
+        scene.HardShadowMaxLength = header.HSmaxLengthMultiplier;
+        scene.SoftShadowRadius = Math.Max(1e-4, header.MCSoftShadowRadius);
+        scene.SoftShadow = (header.Calc1HSsoft & 1) != 0;
         // mctDEstopFactor = GetDEstopFactor (HeaderTrafos.pas:58-72): stepwidth growth per unit depth.
         scene.DEstopFactor = 0;
         if (scene.VaryDEstop)

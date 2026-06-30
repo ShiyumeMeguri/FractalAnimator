@@ -37,6 +37,12 @@ public static class Mb3dShader
             Vec3d l = light.Direction;
             double lightShadow = light.SubAmbShadow ? dAmbSh : dFog;
 
+            // Directional hard/soft shadow: march a ray from the surface toward this light. The factor
+            // (1 = lit, 0 = shadowed) multiplies IN ADDITION to dFog/dAmbSh, exactly as MB3D applies
+            // (PaintThread.pas:521-522/536-537: dTmp *= dFog then dTmp *= (Shadow shr 10)*s1d63).
+            if (light.HardShadow)
+                lightShadow *= Mb3dHardShadow.Compute(hit, light, scene);
+
             double diffuse = Mb3dDiffuseTable.Evaluate(light.DiffuseFunction, Vec3d.Dot(n, l), paint.Roughness) * lightShadow;
             diffuseLight += light.Color * diffuse;
 

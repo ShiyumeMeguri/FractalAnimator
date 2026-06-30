@@ -12,6 +12,8 @@ public struct Mb3dRenderLight
     public int SpecularExponent;
     public double MaxDistanceSquared;
     public bool SubAmbShadow;   // bSubAmbSh: scale this light by dAmbSh (HS wanted but not computed) vs dFog
+    public bool HardShadow;     // iHScalced: HS enabled for this light (Loption bit6 clear) AND its
+                                // bCalculateHardShadow bit set -> march a shadow ray for it (Mb3dHardShadow)
 }
 
 /// <summary>
@@ -87,11 +89,18 @@ public sealed class Mb3dPaintParameters
             if (!rl.Active) continue;
             rl.DiffuseFunction = (l.Function >> 4) & 3;
             rl.SpecularExponent = 2 << (l.Function & 7);
-            // bSubAmbSh = iHScalced xor iHSenabled (HeaderTrafos.pas:1337-1338, PaintThread.pas:496):
-            // true only when this light wants a hard shadow that wasn't computed (AO fallback);
-            // otherwise the light is scaled by the gentle dFog and hard shadows handle direction.
+            // iHSenabled = 1 - Loption.bit6 (HeaderTrafos.pas:1337): this light wants a hard shadow.
+            // iHScalced = iHSenabled AND (bHScalculated bit) (HeaderTrafos.pas:1338): a hard shadow is
+            // only APPLIED at paint time when it was actually pre-computed. Gating on bHScalculated (not
+            // the bCalculateHardShadow request) is what matches the saved previews — these three files
+            // have bHScalculated = 0, so their previews carry NO baked hard shadows.
             int hsEnabled = 1 - ((l.Option >> 6) & 1);
-            int hsCalced = hsEnabled & ((header.HScalculated >> (i + 2)) & 1);
+            int hsBit = (header.HScalculated >> (i + 2)) & 1;
+            int hsCalced = hsEnabled & hsBit;
+            rl.HardShadow = hsCalced != 0;
+            // bSubAmbSh = iHScalced xor iHSenabled (PaintThread.pas:496): when a light wants a hard shadow
+            // that was NOT computed, the ambient-occlusion factor stands in for it (dAmbSh); otherwise the
+            // gentler diffuse-shadow fog dFog applies and the (computed) hard shadow handles direction.
             rl.SubAmbShadow = (hsCalced ^ hsEnabled) != 0;
             bool positional = (((l.Option >> 2) & 7) | ((l.Function & 128) >> 4) & 1) != 0
                               && ((l.Option >> 2) & 1) != 0;
