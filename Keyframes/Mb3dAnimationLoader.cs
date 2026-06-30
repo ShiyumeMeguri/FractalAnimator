@@ -17,7 +17,7 @@ public sealed class Mb3dAnimationLoader : ImageLoader
 {
     private readonly List<Mb3dKeyframeImage> _frames;
 
-    public Mb3dAnimationLoader(string path, int renderWidth = 0, int renderHeight = 0)
+    public Mb3dAnimationLoader(string path, int renderWidth = 0, int renderHeight = 0, int superSample = 2)
     {
         var animation = Mb3dAnimation.Load(path);
         if (animation.Keyframes.Count == 0)
@@ -33,7 +33,7 @@ public sealed class Mb3dAnimationLoader : ImageLoader
 
         _frames = [];
         for (var i = 0; i < animation.Keyframes.Count; i++)
-            _frames.Add(new Mb3dKeyframeImage(animation.Keyframes[i], renderWidth, renderHeight, i));
+            _frames.Add(new Mb3dKeyframeImage(animation.Keyframes[i], renderWidth, renderHeight, i, superSample));
     }
 
     public override FractalImage Get(int index) => _frames[index];
@@ -42,25 +42,62 @@ public sealed class Mb3dAnimationLoader : ImageLoader
     private sealed class Mb3dKeyframeImage : FractalImage
     {
         private readonly Mb3dKeyframe _keyframe;
-        private readonly int _width, _height;
+        private readonly int _width, _height, _superSample;
         private Bitmap? _bitmap;
 
-        public Mb3dKeyframeImage(Mb3dKeyframe keyframe, int width, int height, int index)
+        public Mb3dKeyframeImage(Mb3dKeyframe keyframe, int width, int height, int index, int superSample)
         {
             _keyframe = keyframe;
             _width = width;
             _height = height;
+            _superSample = superSample;
             scale = new FractalScale(index); // sequential index; MB3D animations are time-based, not zoom-based
         }
 
         public override Bitmap GetImage()
         {
             if (_bitmap != null) return _bitmap;
-            var scene = Mb3dSceneParameters.FromHeader(_keyframe.Header, _keyframe.Addon, _width, _height);
+            // Supersample: render at superSample x the target size, then box-average down. MB3D itself
+            // oversamples (the AniScale factor) and downscales, so this anti-aliasing is what matches the
+            // smooth reference frames rather than a point-sampled (noisier) image.
+            int ss = Math.Max(1, _superSample);
+            int hiW = _width * ss, hiH = _height * ss;
+            var scene = Mb3dSceneParameters.FromHeader(_keyframe.Header, _keyframe.Addon, hiW, hiH);
             var paint = Mb3dPaintParameters.FromHeader(_keyframe.Header);
             uint[] pixels = new Mb3dRenderer(scene, paint).Render();
+            if (ss > 1) pixels = Downsample(pixels, hiW, hiH, ss);
             _bitmap = ToBitmap(pixels, _width, _height);
             return _bitmap;
+        }
+
+        // Box-average ss*ss source pixels into each destination pixel (downscale anti-aliasing).
+        private static uint[] Downsample(uint[] src, int srcW, int srcH, int ss)
+        {
+            int dstW = srcW / ss, dstH = srcH / ss;
+            var dst = new uint[dstW * dstH];
+            int blockArea = ss * ss;
+            for (var dy = 0; dy < dstH; dy++)
+            {
+                for (var dx = 0; dx < dstW; dx++)
+                {
+                    uint r = 0, g = 0, b = 0;
+                    int sx0 = dx * ss, sy0 = dy * ss;
+                    for (var by = 0; by < ss; by++)
+                    {
+                        int row = (sy0 + by) * srcW + sx0;
+                        for (var bx = 0; bx < ss; bx++)
+                        {
+                            uint p = src[row + bx];
+                            r += (p >> 16) & 0xFF;
+                            g += (p >> 8) & 0xFF;
+                            b += p & 0xFF;
+                        }
+                    }
+                    dst[dy * dstW + dx] = 0xFF000000u
+                        | ((r / (uint)blockArea) << 16) | ((g / (uint)blockArea) << 8) | (b / (uint)blockArea);
+                }
+            }
+            return dst;
         }
 
         public override void Dispose()
