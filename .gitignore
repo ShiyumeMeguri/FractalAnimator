@@ -399,3 +399,8 @@ FodyWeavers.xsd
 
 # JetBrains Rider
 *.sln.iml
+
+# renderer runtime artefacts
+timeline.bin
+sequence_out/
+seqtest/

@@ -160,7 +160,7 @@ public sealed class MainForm : Form, IExportable
         _renderer = new VideoRenderer();
         var mgr = _loaderCfg?.Get(); var interp = _interpCfg?.Get();
         if (mgr == null || interp == null) { ShowError(Localization.Get("message.missing_image")); return; }
-        _renderer.SetInterpolator(interp); _renderer.SetMergeFrames(_genOpts.GetBlend());
+        _renderer.SetInterpolator(interp);
         var sel = _indiPanel.GetSelected();
         if (sel.Count == 0)
         {

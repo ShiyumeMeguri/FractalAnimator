@@ -160,15 +160,6 @@ public sealed class OdometerIndicator : IScaleIndicator
     void InitCanvas() { _canvas.Dispose(); _bm.Dispose(); _bm = new((int)(ScaleBase * _scale / 2 * Digits + Margin * _scale * (Digits + 1)), (int)(ScaleBase * _scale)); _canvas = Graphics.FromImage(_bm); _canvas.SmoothingMode = SmoothingMode.AntiAlias; _canvas.TextRenderingHint = TextRenderingHint.AntiAlias; }
 }
 
-public sealed class AsyncFrameLoader
-{
-    readonly ImageLoader _loader; FractalImage? _current; readonly BlockingCollection<int> _q;
-    readonly Thread _t;
-    public AsyncFrameLoader(ImageLoader l) { _loader = l; _q = new(8); _t = new(() => { foreach (var i in _q.GetConsumingEnumerable()) _current = l.Acquire(i); }) { IsBackground = true }; _t.Start(); }
-    public void DelegateLoad(int i) { try { _q.Add(i); } catch { } }
-    public FractalImage? GetCurrent() => _current;
-}
-
 public sealed class FFmpegProcess
 {
     readonly ProcessStartInfo _psi; readonly BlockingCollection<byte[]> _q;
@@ -207,12 +198,10 @@ public sealed class VideoRenderer
 {
     int _w, _h; double _fps; Interpolator? _interp; readonly List<IScaleIndicator> _inds = [];
     BlockingCollection<Bitmap>? _pool; volatile int _rendered, _renderedKf, _totalKf; bool _finished;
-    double _startTime, _endTime; int _mergeFrames = 4;
+    double _startTime, _endTime;
     FFmpegProcess? _proc; CancellationTokenSource? _cts;
 
     public void SetInterpolator(Interpolator v) => _interp = v;
-    public int GetMergeFrames() => _mergeFrames;
-    public void SetMergeFrames(int v) => _mergeFrames = v;
 
     public void FfmpegRender(ImageLoader mgr, RenderParams p, string file)
     {
@@ -224,74 +213,56 @@ public sealed class VideoRenderer
         _startTime = p.StartTime; _endTime = p.EndTime;
         var iScale = _w / 1920.0; foreach (var ind in _inds) ind.SetScale(iScale);
         _cts = new();
-        if (p.StartTime > 0) RenderFrame(Enumerable.Repeat(0.0, (int)(_fps * _startTime)).ToList(), _proc, mgr.Acquire(0), mgr.Acquire(1), mgr.Acquire(2));
-        var imgs = new FractalImage?[_mergeFrames]; var fn = 0;
+
+        // Every output frame is rendered at exactly its own zoom, natively at the output resolution.
+        // There is deliberately no keyframe-scaling path: producing an in-between frame by magnifying a
+        // neighbouring keyframe (and cross-fading two of them) makes that frame a blurred upscale of a
+        // shallower depth rather than the fractal at the depth it claims to show. For an offline render
+        // that trade buys nothing worth having, so it does not exist here.
+        if (mgr is not IExactZoomRenderer exact)
+            throw new InvalidOperationException(
+                $"{mgr.GetType().Name} cannot render at arbitrary zoom. Offline video output requires an " +
+                "IExactZoomRenderer source so every frame is computed at its own zoom; scaling keyframes " +
+                "to fake in-between frames is not supported.");
+
         using var tl = new FileStream("timeline.bin", FileMode.Create, FileAccess.Write);
-        var asyncL = new AsyncFrameLoader(mgr);
-        var done = false;
-        for (var i = 0; i < mgr.Size() && !done; i++)
+        var first = _interp.Get(0.0);
+        for (var i = 0; i < (int)(_fps * _startTime); i++) RenderExactFrame(exact, first, _proc);
+        for (var fn = 0; ; fn++)
         {
             _cts.Token.ThrowIfCancellationRequested();
-            var f = mgr.Acquire(i)!; var scales = new List<double>();
-            while (true)
-            {
-                var t = fn * 1.0 / _fps;
-                if (_interp.IsOutside(t)) { done = true; break; }
-                var v = _interp.Get(t);
-                WriteDoubleBE(tl, v);
-                if (v > i + 1) break;
-                scales.Add(v); fn++;
-            }
-            imgs[0] = f;
-            for (var j = 1; j < _mergeFrames; j++) imgs[j] = mgr.Acquire(i + j);
-            asyncL.DelegateLoad(i + _mergeFrames);
-            if (scales.Count > 0) RenderFrame(scales, _proc, imgs);
-            _renderedKf = i + 1; f.Dispose();
+            var t = fn * 1.0 / _fps;
+            if (_interp.IsOutside(t)) break;
+            var v = _interp.Get(t);
+            WriteDoubleBE(tl, v);
+            RenderExactFrame(exact, v, _proc);
+            _renderedKf = (int)v + 1;
         }
-        if (p.EndTime > 0 && !mgr.IsUnbounded) RenderFrame(Enumerable.Repeat((double)(mgr.Size() - 1), (int)(_fps * _endTime)).ToList(), _proc, mgr.GetLast());
+        if (p.EndTime > 0 && !mgr.IsUnbounded)
+        {
+            var last = (double)(mgr.Size() - 1);
+            for (var i = 0; i < (int)(_fps * _endTime); i++) RenderExactFrame(exact, last, _proc);
+        }
         _proc.Finish(); _finished = true;
     }
 
     // Compositing is serial on purpose: System.Drawing Bitmaps and the indicator objects are not
-    // thread-safe, and the expensive part (perturbation keyframe generation) is already parallel
-    // inside the engine and prefetched on a background thread, so this is not the bottleneck.
-    void RenderFrame(List<double> factors, FFmpegProcess p, params FractalImage?[] frames)
+    // thread-safe, and the expensive part (the fractal render itself) is already parallel inside the
+    // engine, so this is not the bottleneck.
+    void RenderExactFrame(IExactZoomRenderer exact, double index, FFmpegProcess p)
     {
-        var baseF = (int)factors[0];
-        var images = new Bitmap?[frames.Length];
-        for (var i = 0; i < images.Length; i++)
-            if (frames[i] != null) images[i] = frames[i]!.GetImage();
-        var fix = Math.Log(_w * 1.0 / _h) / Math.Log(2) - Math.Log(images[0]!.Width * 1.0 / images[0]!.Height) / Math.Log(2);
-        var baseScale = frames[0]?.GetScale()?.GetZooms() ?? 0;
-        foreach (var factor in factors)
+        var zooms = exact.ZoomsForIndex(index);
+        using var frame = exact.RenderAtZoom(zooms, _w, _h, _cts!.Token);
+        var buf = _pool!.Take(_cts.Token);
+        using (var g = Graphics.FromImage(buf))
         {
-            _cts!.Token.ThrowIfCancellationRequested();
-            var buf = _pool!.Take(_cts.Token);
-            using (var g = Graphics.FromImage(buf))
-            {
-                g.SmoothingMode = SmoothingMode.AntiAlias;
-                g.InterpolationMode = InterpolationMode.Bilinear;
-                g.PixelOffsetMode = PixelOffsetMode.HighQuality;
-                for (var i = 0; i < images.Length; i++)
-                    if (images[i] != null) PutImage(images[i]!, g, (factor - baseF) - i, buf.Width, buf.Height);
-                g.CompositingMode = CompositingMode.SourceCopy;
-                foreach (var ind in _inds) ind.Draw(g, new FractalScale(baseScale + (factor - baseF) + fix), _w, _h);
-            }
-            Interlocked.Increment(ref _rendered);
-            p.SubmitFrame(buf);
-            _pool.Add(buf);
+            g.CompositingMode = CompositingMode.SourceCopy;
+            g.DrawImageUnscaled(frame, 0, 0);
+            foreach (var ind in _inds) ind.Draw(g, new FractalScale(zooms), _w, _h);
         }
-    }
-
-    static void PutImage(Bitmap img, Graphics g, double factor, int bgW, int bgH)
-    {
-        var sf = Math.Pow(2, factor) * Math.Max(bgW, bgH) / Math.Max(img.Width, img.Height);
-        var ox = (bgW - img.Width * sf) / 2; var oy = (bgH - img.Height * sf) / 2;
-        var op = (float)Math.Min(1, Math.Pow(2, factor));
-        using var attrs = new ImageAttributes();
-        var cm = new ColorMatrix { Matrix33 = op }; attrs.SetColorMatrix(cm);
-        g.CompositingMode = CompositingMode.SourceOver;
-        g.DrawImage(img, Rectangle.Round(new((float)ox, (float)oy, (float)(img.Width * sf), (float)(img.Height * sf))), 0, 0, img.Width, img.Height, GraphicsUnit.Pixel, attrs);
+        Interlocked.Increment(ref _rendered);
+        p.SubmitFrame(buf);
+        _pool.Add(buf);
     }
 
     public void AddScaleIndicator(IScaleIndicator i) => _inds.Add(i);

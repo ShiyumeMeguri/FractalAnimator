@@ -14,6 +14,23 @@ public abstract class FractalImage : IComparable<FractalImage>, IDisposable
     public abstract void Dispose();
 }
 
+/// <summary>
+/// A source that can render the fractal at an arbitrary, non-integer zoom and at arbitrary output
+/// dimensions — i.e. every video frame is computed at exactly the zoom that frame is supposed to show.
+///
+/// This exists so the video renderer never has to fake in-between frames by scaling a neighbouring
+/// keyframe. Scaling is a quality downgrade (the frame is a magnified lower-resolution image, not the
+/// fractal at that depth), and for an offline render there is no reason to accept it.
+/// </summary>
+public interface IExactZoomRenderer
+{
+    /// <summary>Renders at exactly <paramref name="zooms"/>, natively at the requested pixel size.</summary>
+    Bitmap RenderAtZoom(double zooms, int width, int height, CancellationToken token);
+
+    /// <summary>Maps the interpolator's (fractional) keyframe index onto an absolute zoom level.</summary>
+    double ZoomsForIndex(double index);
+}
+
 public abstract class ImageLoader : IEnumerable<FractalImage>
 {
     public abstract FractalImage Get(int index);
