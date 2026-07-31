@@ -118,48 +118,32 @@ public static class CertifiedRenderer
         var decoupled = new long[Environment.ProcessorCount];
         var rebases = new long[Environment.ProcessorCount];
 
-        var magnitude = CertifiedIteratorBatch.Magnitudes(orbit.MagnitudeSquared, orbit.Length);
-        var batchSize = Math.Max(1, CertifiedIteratorBatch.BatchSize);
-
         var partitioner = System.Collections.Concurrent.Partitioner.Create(0, pendingCount);
         Parallel.ForEach(partitioner, new ParallelOptions { CancellationToken = token }, range =>
         {
             var slot = Environment.CurrentManagedThreadId % decoupled.Length;
             long localDecoupled = 0, localRebases = 0;
-            var deltas = new Cx<T>[batchSize];
-            var batchResults = new PixelResult[batchSize];
 
-            for (var k0 = range.Item1; k0 < range.Item2; k0 += batchSize)
+            for (var k = range.Item1; k < range.Item2; k++)
             {
-                var take = Math.Min(batchSize, range.Item2 - k0);
-                for (var j = 0; j < take; j++)
-                {
-                    var index = pending[k0 + j];
-                    var x = index % width;
-                    var y = index / width;
-                    deltas[j] = Cx<T>.FromDouble((x - centerX) * offsetToDelta, (centerY - y) * offsetToDelta);
-                }
+                var index = pending[k];
+                var x = index % width;
+                var y = index / width;
+                var delta = Cx<T>.FromDouble((x - centerX) * offsetToDelta, (centerY - y) * offsetToDelta);
 
-                CertifiedIteratorBatch<T, PowerJuliaAtom<T>, BStyleTrapAtom>
-                    .Iterate(orbit, magnitude, deltas, take, scaleExp, maxIterations, batchResults);
+                var result = CertifiedIterator<T, PowerJuliaAtom<T>, BStyleTrapAtom>
+                    .Iterate(orbit, delta, scaleExp, maxIterations);
 
-                for (var j = 0; j < take; j++)
-                {
-                    var k = k0 + j;
-                    var index = pending[k];
-                    var result = batchResults[j];
+                localDecoupled += result.DecoupledSteps;
+                localRebases += result.Rebases;
 
-                    localDecoupled += result.DecoupledSteps;
-                    localRebases += result.Rebases;
+                if (result.Verdict == PixelVerdict.NeedsHigherPrecision) { survived[k] = true; continue; }
 
-                    if (result.Verdict == PixelVerdict.NeedsHigherPrecision) { survived[k] = true; continue; }
-
-                    var (r, g, b) = BStyleTrapAtom.Resolve(result.Color, result.Iterations);
-                    var o = index * 3;
-                    outputRgb[o + 0] = (float)r;
-                    outputRgb[o + 1] = (float)g;
-                    outputRgb[o + 2] = (float)b;
-                }
+                var (r, g, b) = BStyleTrapAtom.Resolve(result.Color, result.Iterations);
+                var o = index * 3;
+                outputRgb[o + 0] = (float)r;
+                outputRgb[o + 1] = (float)g;
+                outputRgb[o + 2] = (float)b;
             }
             Interlocked.Add(ref decoupled[slot], localDecoupled);
             Interlocked.Add(ref rebases[slot], localRebases);

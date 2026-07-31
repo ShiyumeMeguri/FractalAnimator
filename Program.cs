@@ -50,6 +50,8 @@ internal static class Program
             return SelfTest.KernelTruth(args);
         if (args.Length > 0 && args[0].Equals("--trapbound", StringComparison.OrdinalIgnoreCase))
             return FractalAnimator.Diagnostics.TrapBoundCheck.Run();
+        if (args.Length > 0 && args[0].Equals("--kernelprofile", StringComparison.OrdinalIgnoreCase))
+            return FractalAnimator.KernelProfile.Run(args);
         if (args.Length > 0 && args[0].Equals("--kernelframe", StringComparison.OrdinalIgnoreCase))
             return SelfTest.KernelFrame(args);
         if (args.Length > 0 && args[0].Equals("--sequence", StringComparison.OrdinalIgnoreCase))
@@ -1120,7 +1122,6 @@ internal static class SelfTest
             Console.WriteLine($"  esc FP64 ball={r64[0]} supInf={r64[1]} denom={r64[2]} cap={r64[3]} escMargin={r64[4]} colour={r64[5]} orbitEnd={r64[6]} rebaseCap={r64[7]}");
             Console.WriteLine($"  esc DD   ball={rdd[0]} supInf={rdd[1]} denom={rdd[2]} cap={rdd[3]} escMargin={rdd[4]} colour={rdd[5]} orbitEnd={rdd[6]} rebaseCap={rdd[7]}");
             Console.WriteLine($"  esc QD   ball={rqd[0]} supInf={rqd[1]} denom={rqd[2]} cap={rqd[3]} escMargin={rqd[4]} colour={rqd[5]} orbitEnd={rqd[6]} rebaseCap={rqd[7]}");
-            Console.WriteLine($"  batchMode={FractalAnimator.Core.Kernel.CertifiedIteratorBatch.Mode} batchEsc={FractalAnimator.Core.Kernel.CertifiedIteratorBatch.EscalationReport()}");
             var cb = FractalAnimator.Core.Kernel.CertifiedIterator<DoubleDouble,
                 FractalAnimator.Core.Atoms.PowerJuliaAtom<DoubleDouble>,
                 FractalAnimator.Core.Atoms.BStyleTrapAtom>.CapBuckets;

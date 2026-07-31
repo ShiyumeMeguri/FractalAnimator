@@ -571,7 +571,7 @@ public static class DecouplingAudit
         var t = new TraceResult { Name = $"NEW({T.RungName},{(rebaseEnabled ? "rebase" : "norebase")})" };
         var delta = Cx<T>.FromDouble(deltaCReal, deltaCImag);
         var scaleExp = scaleExp0;
-        var color = new ColorState { TrapMin = 1e5, TrapMinError = 0.0, FinalMagnitudeSquared = 1.0 };
+        var color = ColorState.Fresh(1e5);
 
         var relativeError = 0.0;
         var referenceIndex = 0;

@@ -71,7 +71,7 @@ public static class ArbitraryPrecisionFallback
         var ctx = new MathContextCompat(precision);
         var zr = cRe;
         var zi = cIm;
-        state = new ColorState { TrapMin = 1e5, TrapMinError = 0.0, FinalMagnitudeSquared = 1.0 };
+        state = ColorState.Fresh(1e5);
 
         var relativeError = Math.Pow(10.0, 1 - precision);
         var accumulated = 0.0;

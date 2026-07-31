@@ -433,7 +433,7 @@ public static class KernelProfile
         where TShape : struct, IShape
     {
         var delta = deltaC;
-        var color = new ColorState { TrapMin = 1e5, TrapMinError = 0.0, FinalMagnitudeSquared = 1.0 };
+        var color = ColorState.Fresh(1e5);
 
         var relativeError = 0.0;
         var referenceIndex = 0;
@@ -553,8 +553,8 @@ public static class KernelProfile
                 }
                 else
                 {
-                    color.TrapMin = Math.Min(color.TrapMin, magnitudeSquared);
-                    color.TrapMinError += displayError;
+                    color.TrapLo = Math.Min(color.TrapLo, magnitudeSquared);
+                    color.TrapHi = Math.Min(color.TrapHi, magnitudeSquared) + displayError;
                 }
 
                 if (KernelOptions.RebaseEnabled && decoupled && offsetMagnitude > 0.0)

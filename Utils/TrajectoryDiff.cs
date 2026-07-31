@@ -199,7 +199,7 @@ public static class TrajectoryDiff
     {
         var samples = new List<Sample>();
         var delta = Cx<DoubleDouble>.FromDouble(deltaCRe, deltaCIm);
-        var color = new ColorState { TrapMin = 1e5, TrapMinError = 0.0, FinalMagnitudeSquared = 1.0 };
+        var color = ColorState.Fresh(1e5);
         var referenceIndex = 0;
         var limit = Math.Min(maxIterations - 1, steps);
         for (var n = 0; n < limit; n++)

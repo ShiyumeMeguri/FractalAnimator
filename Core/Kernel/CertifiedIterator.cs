@@ -37,7 +37,7 @@ public static class CertifiedIterator<T, TFractal, TColor>
         ReferenceOrbit<T> orbit, Cx<T> deltaC, int scaleExp, int maxIterations)
     {
         var delta = deltaC;
-        var color = new ColorState { TrapMin = 1e5, TrapMinError = 0.0, FinalMagnitudeSquared = 1.0 };
+        var color = ColorState.Fresh(1e5);
 
         var relativeError = 0.0;
         var referenceIndex = 0;

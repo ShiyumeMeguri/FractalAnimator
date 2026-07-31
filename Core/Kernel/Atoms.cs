@@ -19,10 +19,27 @@ public interface IFractalAtom<T> where T : struct, IPrecision<T>
 
 public struct ColorState
 {
-    public double TrapMin;
-    public double TrapMinError;
+    public double TrapLo;
+    public double TrapHi;
+    public double WindowKey;
+    public double WindowLoA;
+    public double WindowHiA;
+    public double WindowLoB;
+    public double WindowHiB;
     public double FinalMagnitudeSquared;
     public double FinalPointError;
+
+    public readonly double TrapMin => 0.5 * (TrapLo + TrapHi);
+    public readonly double TrapMinError => 0.5 * (TrapHi - TrapLo);
+
+    public static ColorState Fresh(double seed) => new()
+    {
+        TrapLo = seed,
+        TrapHi = seed,
+        WindowKey = double.NaN,
+        FinalMagnitudeSquared = 1.0,
+        FinalPointError = 0.0,
+    };
 }
 
 public interface IColoringAtom

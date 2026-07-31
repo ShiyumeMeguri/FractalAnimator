@@ -21,6 +21,16 @@ public readonly struct Interval
         return new Interval(Down(centre - r), Up(centre + r));
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Interval ScaledBall(double value, double radius, double scale)
+    {
+        if (double.IsNaN(value) || double.IsNaN(radius) || double.IsNaN(scale))
+            return new Interval(double.NaN, double.NaN);
+        var centre = scale * value;
+        var r = Up(scale * Math.Abs(radius));
+        return new Interval(Down(Down(centre) - r), Up(Up(centre) + r));
+    }
+
     public bool IsEmpty => double.IsNaN(Lo) || double.IsNaN(Hi);
     public double Width => Hi - Lo;
     public double Centre => 0.5 * (Lo + Hi);
@@ -36,8 +46,46 @@ public readonly struct Interval
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     static double Up(double v) => double.IsFinite(v) ? Math.BitIncrement(v) : v;
 
-    static double DownN(double v, int n) { for (var i = 0; i < n && double.IsFinite(v); i++) v = Math.BitDecrement(v); return v; }
-    static double UpN(double v, int n) { for (var i = 0; i < n && double.IsFinite(v); i++) v = Math.BitIncrement(v); return v; }
+    const long NegativeInfinityBits = unchecked((long)0xFFF0000000000000UL);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    static double DownN(double v, int n)
+    {
+        if (!double.IsFinite(v)) return v;
+        var bits = BitConverter.DoubleToInt64Bits(v);
+        if (v > 0.0)
+        {
+            if (bits > n) return BitConverter.Int64BitsToDouble(bits - n);
+        }
+        else if (v < 0.0)
+        {
+            var moved = bits + n;
+            if (moved < NegativeInfinityBits) return BitConverter.Int64BitsToDouble(moved);
+        }
+        return StepDown(v, n);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    static double UpN(double v, int n)
+    {
+        if (!double.IsFinite(v)) return v;
+        var bits = BitConverter.DoubleToInt64Bits(v);
+        if (v > 0.0)
+        {
+            var moved = bits + n;
+            if (moved < PositiveInfinityBits) return BitConverter.Int64BitsToDouble(moved);
+        }
+        else if (v < 0.0)
+        {
+            if (bits - n < 0L) return BitConverter.Int64BitsToDouble(bits - n);
+        }
+        return StepUp(v, n);
+    }
+
+    const long PositiveInfinityBits = 0x7FF0000000000000L;
+
+    static double StepDown(double v, int n) { for (var i = 0; i < n && double.IsFinite(v); i++) v = Math.BitDecrement(v); return v; }
+    static double StepUp(double v, int n) { for (var i = 0; i < n && double.IsFinite(v); i++) v = Math.BitIncrement(v); return v; }
 
     static Interval Loose(double lo, double hi) =>
         new(DownN(lo, TranscendentalUlps), UpN(hi, TranscendentalUlps));
@@ -56,6 +104,10 @@ public readonly struct Interval
 
     public static Interval operator *(Interval a, double b) =>
         b >= 0 ? new Interval(Down(a.Lo * b), Up(a.Hi * b)) : new Interval(Down(a.Hi * b), Up(a.Lo * b));
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Interval SqrNonNegative(Interval a) =>
+        new(Down(a.Lo * a.Lo), Up(a.Hi * a.Hi));
 
     public static Interval operator /(Interval a, Interval b)
     {
@@ -85,6 +137,12 @@ public readonly struct Interval
     {
         if (a.Lo <= 0) return new Interval(double.NaN, double.NaN);
         return Loose(Math.Log(a.Lo), Math.Log(a.Hi));
+    }
+
+    public static Interval Exp(Interval a)
+    {
+        if (a.IsEmpty) return a;
+        return Loose(Math.Exp(a.Lo), Math.Exp(a.Hi));
     }
 
     public static Interval Log2(Interval a)
@@ -120,6 +178,41 @@ public readonly struct Interval
         var lo = Math.Max(baseValue.Lo, 0.0);
         return Loose(Math.Pow(lo, exponent), Math.Pow(Math.Max(baseValue.Hi, 0.0), exponent));
     }
+
+    public static int VerifyDirectedRounding()
+    {
+        double[] probes =
+        [
+            0.0, -0.0, double.Epsilon, -double.Epsilon, 2.0 * double.Epsilon, -2.0 * double.Epsilon,
+            5e-324, 1e-320, -1e-320, 2.2250738585072014e-308, -2.2250738585072014e-308,
+            2.225073858507201e-308, 1e-300, -1e-300, 1e-16, -1e-16, 0.1, -0.1, 0.5, -0.5,
+            1.0, -1.0, 1.5, -1.5, 2.0, -2.0, 1e15, -1e15, 1e300, -1e300,
+            double.MaxValue, double.MinValue, double.PositiveInfinity, double.NegativeInfinity, double.NaN,
+        ];
+
+        var failures = 0;
+        foreach (var v in probes)
+        {
+            for (var n = 1; n <= TranscendentalUlps; n++)
+            {
+                if (!Agrees(DownN(v, n), Reference(v, n, true))) failures++;
+                if (!Agrees(UpN(v, n), Reference(v, n, false))) failures++;
+            }
+            if (!Agrees(Down(v), Reference(v, 1, true))) failures++;
+            if (!Agrees(Up(v), Reference(v, 1, false))) failures++;
+        }
+        return failures;
+    }
+
+    static double Reference(double v, int n, bool down)
+    {
+        for (var i = 0; i < n && double.IsFinite(v); i++)
+            v = down ? Math.BitDecrement(v) : Math.BitIncrement(v);
+        return v;
+    }
+
+    static bool Agrees(double a, double b) =>
+        double.IsNaN(a) ? double.IsNaN(b) : BitConverter.DoubleToInt64Bits(a) == BitConverter.DoubleToInt64Bits(b);
 
     public override string ToString() => $"[{Lo:G17}, {Hi:G17}]";
 }
